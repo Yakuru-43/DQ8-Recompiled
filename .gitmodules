@@ -1,6 +1,7 @@
 [submodule "thirdparty/PS2Recomp"]
 	path = thirdparty/PS2Recomp
-	url = https://github.com/Sinan-Karakaya/PS2Recomp.git
+	url = https://github.com/Yakuru-43/PS2Recomp.git
+	branch = fix/dq8-math-vu-and-cutscenes
 [submodule "thirdparty/simde"]
 	path = thirdparty/simde
 	url = https://github.com/simd-everywhere/simde.git
