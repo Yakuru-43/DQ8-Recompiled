@@ -185,6 +185,22 @@ int main(int argc, char **argv)
         return 1;
     }
 
+#if defined(DQ8_HAS_SDLGPU)
+    if (sdlWindowBackend != nullptr)
+    {
+        // The game's Screen Size setting (Normal 4:3 / Wide Screen 16:9), for
+        // the settings menu's Auto aspect. The byte at gp-0x7014 is what
+        // 0x168FF0 sets and 0x168F90 turns into the projection's horizontal
+        // factor (0.75 for 4:3, 0.5625 for 16:9); SLUS-212.07 addresses.
+        constexpr uint32_t kScreenSizeFlag = 0x003D275Cu;
+        const uint8_t *rdram = runtime.memory().getRDRAM();
+        sdlWindowBackend->setGameWidescreenQuery([rdram]() -> int {
+            const uint8_t value = rdram[kScreenSizeFlag];
+            return value <= 1u ? static_cast<int>(value) : -1;
+        });
+    }
+#endif
+
     // The sound drivers from the disc run unmodified on an emulated IOP, and
     // the game's libsdr and Sound Kit reach them over SIF. Audio output starts
     // when sceSifLoadModule loads the first of them.
@@ -224,9 +240,11 @@ int main(int argc, char **argv)
             if (const char *trace = std::getenv("DQ8_GS_TRACE")) {
                 const char *start = std::getenv("DQ8_GS_TRACE_START");
                 const char *trigger = std::getenv("DQ8_GS_TRACE_TRIGGER");
+                const char *frames = std::getenv("DQ8_GS_TRACE_FRAMES");
                 backend = std::make_unique<dq8::gfx::GsTraceBackend>(
                     std::move(backend), trace, start ? std::strtoul(start, nullptr, 10) : 7550u,
-                    4u, trigger ? trigger : "");
+                    frames ? static_cast<uint32_t>(std::strtoul(frames, nullptr, 10)) : 4u,
+                    trigger ? trigger : "");
             }
             runtime.gs().setRasterBackend(dq8::diagnostics::wrapGsFanProbe(
                 std::move(backend), runtime.memory().getRDRAM(), PS2_RAM_SIZE));
@@ -323,12 +341,17 @@ int main(int argc, char **argv)
 #endif
 
     std::printf("[dq8] starting execution at 0x%08X\n", entryPoint);
-    [[maybe_unused]] const bool renderCounterReady = dq8::diagnostics::configureRenderCadenceProbe(runtime);
 #if defined(DQ8_HAS_SDLGPU)
+    // The settings menu can show the frame rate at any time, so the counter
+    // goes in whenever the backend owns the window.
+    const bool renderCounterReady =
+        dq8::diagnostics::configureRenderCadenceProbe(runtime, sdlWindowBackend != nullptr);
     if (renderCounterReady && sdlWindowBackend)
         sdlWindowBackend->setCompletedRenderCounter([] {
             return dq8::diagnostics::RenderCadenceProbe::instance().publishedCompletedRoutines();
         });
+#else
+    dq8::diagnostics::configureRenderCadenceProbe(runtime);
 #endif
     runtime.run();
 
