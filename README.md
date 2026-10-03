@@ -25,6 +25,20 @@ It uses a patched PS2Recomp,
 | Wrong VU1 results in programs using EFU instructions | The EFU opcode table was shifted by one from 0x77: ERSQRT ran as ESIN, ESIN as EATAN, EATAN as EEXP, and EEXP stopped the VU | Opcodes match the VU manual and PCSX2 |
 | Matrix, normal and lighting maths wrong where the SDK is used | Several `libvu0` host stubs differed from the SDK code in the game: `MulMatrix` multiplied in reverse order, `Normalize`/`InnerProduct` included w, the `RotTransPers` flag was inverted | Stubs checked line by line against the original routines |
 
+In-game settings menu (`--gs=sdlgpu`): press **F1** (or a controller's Guide
+button, or Back+Start) to open it. While it is open the game gets no input.
+
+| Setting | Choices |
+| --- | --- |
+| Internal resolution | 1x (512x448, original) to 8x, applied immediately |
+| Aspect ratio | 4:3 (what a PS2 shows; default), 16:9 stretched, square pixels (8:7, earlier builds), fill window |
+| Upscaling filter | Sharp bilinear (default), bilinear, nearest (integer scale) |
+| Window | Fullscreen (also F11), frame-rate counter |
+
+Settings are saved to `settings.ini` in SDL's per-user preferences folder
+(`~/.local/share/DQ8Recomp/DQ8Recomp/` on Linux); `--scale=N` still overrides
+the internal resolution for one run.
+
 Also included:
 
 - `DQ8_PAD_RECORD=<file>` records what you play (buttons and analog sticks) in
