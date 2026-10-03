@@ -15,8 +15,8 @@ compatibility are still in progress. The PAL configuration is incomplete.
 
 This is a fork of [Sinan-Karakaya/DQ8-Recompiled](https://github.com/Sinan-Karakaya/DQ8-Recompiled).
 It uses a patched PS2Recomp,
-[Yakuru-43/PS2Recomp](https://github.com/Yakuru-43/PS2Recomp/tree/fix/dq8-math-vu-and-cutscenes)
-(branch `fix/dq8-math-vu-and-cutscenes`), which fixes the following:
+[Yakuru-43/PS2Recomp](https://github.com/Yakuru-43/PS2Recomp/tree/perf/dq8-open-world-and-pad-record)
+(branch `perf/dq8-open-world-and-pad-record`), which fixes the following:
 
 | Symptom in game | Cause | Fix |
 | --- | --- | --- |
@@ -27,8 +27,19 @@ It uses a patched PS2Recomp,
 
 Also included:
 
+- `DQ8_PAD_RECORD=<file>` records what you play (buttons and analog sticks) in
+  the `DQ8_PAD_SCRIPT` format; replay it with `DQ8_PAD_SCRIPT=<file>`. Scripts
+  are applied at the frame the game reads the pad, so a replay from the same
+  save reaches the same place (useful for repeatable benchmarks). Scripts also
+  accept `<frame> STICK <rx>,<ry>,<lx>,<ly> <hold>`.
 - `DQ8_PAD_LIVE=<file>` feeds pad input to a running game: append lines in the
   `DQ8_PAD_SCRIPT` format, counted from the current frame.
+- Open-world speed-ups: VU1 no longer clears a 64 KiB buffer at every program
+  start (about 1 GB/s of memset), GS commands reach the render worker in
+  batches, and `-DDQ8_RUNTIME_ARCH=native` optionally builds the runtime for
+  your CPU. On the world map outside Farebury (Ryzen AI 7 350), the VU1 and GS
+  changes took the game thread from 87% to 84% busy and rendering from 28.6 to
+  29.3 frames/s (the game caps at 30); `native` gains about 1% more.
 - `DQ8_GFX_SHOW_FPS=1` also logs completed renders per second.
 - Opt-in traces: `DQ8_TRACE_VU1_RATE`, `PS2_VU_TRACE_CAMERA`, `DQ8_WATCH`.
 
