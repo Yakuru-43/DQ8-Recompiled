@@ -234,7 +234,16 @@ int main(int argc, char **argv)
                             : "presenting through the runtime");
             std::unique_ptr<GSRasterBackend> backend = std::move(sdlBackend);
             if (const char *worker = std::getenv("DQ8_GS_WORKER"); !worker || std::string(worker) != "0") {
-                backend = std::make_unique<GSThreadedBackend>(std::move(backend));
+                // 32 MiB of queued GS work, about two frames of DQ8's
+                // heaviest scenes: the worker stalls on GPU readbacks in
+                // bursts, and a 4 MiB queue then stopped VU1 too (the 3x
+                // King Trode dialogue: 20 -> 23.5 FPS). DQ8_GS_QUEUE_MB
+                // overrides it.
+                backend = std::make_unique<GSThreadedBackend>(std::move(backend), [] {
+                    const char *mib = std::getenv("DQ8_GS_QUEUE_MB");
+                    const long value = mib ? std::atol(mib) : 0;
+                    return static_cast<size_t>(value > 0 ? value : 32) * 1024u * 1024u;
+                }());
                 std::printf("[dq8] ordered GS worker enabled\n");
             }
             if (const char *trace = std::getenv("DQ8_GS_TRACE")) {
@@ -307,6 +316,12 @@ int main(int argc, char **argv)
     // override it with crt0_start (or the caller's --entry) before the
     // scheduler starts executing.
     runtime.cpu().pc = entryPoint;
+
+    // VU1, with the VIF1 and GIF DMA that feed it, runs on its own thread as it
+    // runs beside the EE on a PS2: in heavy scenes VU1 was most of the game
+    // thread's time. DQ8_MTVU=0 keeps everything on the game thread.
+    if (const char *mtvu = std::getenv("DQ8_MTVU"); !mtvu || std::strcmp(mtvu, "0") != 0)
+        runtime.setMtvuEnabled(true);
 
     if (!std::getenv("DQ8_DISABLE_VU_BOUNDS_FIX") && !dq8::installVuBoundsComparisons(runtime))
         std::fprintf(stderr, "[dq8] VU bounds comparison repair could not be installed\n");
