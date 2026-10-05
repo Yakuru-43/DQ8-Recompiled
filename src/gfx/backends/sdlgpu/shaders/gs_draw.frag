@@ -109,7 +109,11 @@ vec4 fetchTexelAt(ivec2 texel, vec2 subTexel) {
     if (scale > 1)
         physical += g_plane.x >= 0.0 ? ivec2(g_plane)
                                      : ivec2(clamp(subTexel, vec2(0.0), vec2(0.999)) * float(scale));
-    vec4 color = texelFetch(gsTexture, clamp(physical, ivec2(0), size * scale - 1), 0);
+    // Within the bound texture too: an upscaled target's sub-pixels past the
+    // GS's last sample may reach a texel beyond the target, which the CPU
+    // side does not pad when the GS itself never reads it.
+    const ivec2 bound = min(size * scale, textureSize(gsTexture, 0)) - 1;
+    vec4 color = texelFetch(gsTexture, clamp(physical, ivec2(0), bound), 0);
     const uint format = uint(params.misc.z);
     if (format != 0u) {
         uvec4 raw = uvec4(round(color * 255.0));
@@ -155,17 +159,44 @@ vec4 sampleTexture() {
         // GS pixel p covers host pixels [p*scale, (p+1)*scale) and is sampled
         // at the centre of the first. UVs are affine in a UV draw, so the
         // derivatives carry it exactly.
-        const float scale = float((params.control.x >> 24u) & 15u);
-        const vec2 host = gl_FragCoord.xy;
-        const vec2 offset = floor(host / scale) * scale + 0.5 - host;
+        // Integer arithmetic: a float divide by 3 lands just under a whole
+        // number (600 / 3 -> 199.99998), so mod() returned 3 for plane 0 and
+        // every copy at an odd scale read the next GS pixel there.
+        const int scale = int((params.control.x >> 24u) & 15u);
+        const ivec2 host = ivec2(gl_FragCoord.xy);
+        const ivec2 plane = host % scale;
+        const vec2 offset = -vec2(plane);
         texel += dFdx(texel) * offset.x + dFdy(texel) * offset.y;
-        if (int(params.misc.y) == int(scale))
-            g_plane = mod(floor(host), scale);
+        if (int(params.misc.y) == scale)
+            g_plane = vec2(plane);
     }
 
     if ((params.control.x & FLAG_LINEAR) == 0u) {
         const vec2 base = floor(texel + POINT_SAMPLE_BIAS);
         return fetchTexelAt(ivec2(base), texel - base);
+    }
+
+    // An upscaled render target filtered across its own physical texels, as
+    // a GS drawing at the higher resolution would: averaging native texels
+    // instead brings every copy of the frame back down to native detail, and
+    // DQ8 copies the whole frame to its display buffer bilinearly. Native-grid
+    // copies keep their sub-sample plane and stay on the GS path below.
+    const int sourceScale = max(int(params.misc.y), 1);
+    if (sourceScale > 1 && g_plane.x < 0.0) {
+        const vec2 physical = texel * float(sourceScale) - 0.5;
+        const ivec2 first = ivec2(floor(physical));
+        const vec2 weight = physical - vec2(first);
+        vec4 taps[4];
+        for (int i = 0; i < 4; ++i) {
+            const ivec2 p = first + ivec2(i & 1, i >> 1);
+            // Integer floor division: exact at odd scales (a float divide by
+            // 3 can land below a whole number), and texels left of zero wrap
+            // like the GS's.
+            const ivec2 gsTexel = (p - (sourceScale - 1) * ivec2(lessThan(p, ivec2(0)))) / sourceScale;
+            const vec2 sub = (vec2(p - gsTexel * sourceScale) + 0.5) / float(sourceScale);
+            taps[i] = fetchTexelAt(gsTexel, sub);
+        }
+        return mix(mix(taps[0], taps[1], weight.x), mix(taps[2], taps[3], weight.x), weight.y);
     }
 
     // Bilinear about the texel centre, matching the GS's half-texel offset.
