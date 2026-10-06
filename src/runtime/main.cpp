@@ -372,6 +372,7 @@ int main(int argc, char **argv)
     // The test menu (F2) and DQ8_DEBUG_STORY / DQ8_DEBUG_WARP. Its lists come
     // from the DATA archive next to the ELF.
     dq8::GameJump gameJump(runtime);
+    gameJump.installHooks();
 #if defined(DQ8_HAS_SDLGPU)
     if (sdlWindowBackend != nullptr)
     {
