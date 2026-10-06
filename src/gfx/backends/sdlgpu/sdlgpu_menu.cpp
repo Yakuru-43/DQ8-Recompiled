@@ -478,6 +478,27 @@ void SdlGpuMenu::drawTestMenu() {
             ImGui::EndChild();
             ImGui::EndTabItem();
         }
+        if (ImGui::BeginTabItem("Cheats")) {
+            if (data->randomEncounters && data->setRandomEncounters) {
+                bool encounters = data->randomEncounters();
+                if (ImGui::Checkbox("Random battles", &encounters))
+                    data->setRandomEncounters(encounters);
+                ImGui::TextDisabled("Off: walk anywhere without monsters attacking. Battles set by the story still"
+                                    " happen. Back on at the next start.");
+            }
+            ImGui::Spacing();
+            if (data->partyToTopLevel && ImGui::Button("Party to level 99 after one battle")) {
+                data->partyToTopLevel();
+                acted = true;
+            }
+            ImGui::TextDisabled("Hero, Yangus, Jessica and Angelo: level 96 and 1 EXP short of 99, with the stats,"
+                                " spells and abilities of each level, HP and MP full.");
+            ImGui::TextDisabled("Win one battle: each one levels up to 99 and gets the skill points of every skipped"
+                                " level to allocate.");
+            ImGui::TextDisabled("Kept until then only while the game runs: don't restart in between. Use it while"
+                                " walking around.");
+            ImGui::EndTabItem();
+        }
         ImGui::EndTabBar();
     }
     ImGui::End();
